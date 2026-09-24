@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradient for Squircle -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#101726" />
+      <stop offset="100%" stop-color="#060a12" />
+    </linearGradient>
+
+    <!-- Outer Squircle Rim Light -->
+    <linearGradient id="rimGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.7" />
+      <stop offset="100%" stop-color="#1e293b" stop-opacity="0.2" />
+    </linearGradient>
+
+    <!-- Rear Shadow Screen Gradient -->
+    <linearGradient id="rearScreenGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#12406e" />
+      <stop offset="100%" stop-color="#0a2848" />
+    </linearGradient>
+
+    <!-- Front Screen Border Gradient -->
+    <linearGradient id="frontScreenGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00f5ff" />
+      <stop offset="100%" stop-color="#0078ff" />
+    </linearGradient>
+
+    <!-- Lightning Bolt Gradient -->
+    <linearGradient id="boltGrad" x1="0%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#ebf8ff" />
+    </linearGradient>
+
+    <!-- Cyan Glow Filter -->
+    <filter id="neonGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur1" />
+      <feGaussianBlur stdDeviation="16" result="blur2" />
+      <feMerge>
+        <feMergeNode in="blur2" />
+        <feMergeNode in="blur1" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <!-- Bolt Glow -->
+    <filter id="boltGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="#00d2ff" flood-opacity="0.8" />
+    </filter>
+  </defs>
+
+  <!-- 1. Squircle Badge Container -->
+  <rect x="26" y="26" width="460" height="460" rx="110" ry="110"
+        fill="url(#bgGrad)"
+        stroke="url(#rimGrad)"
+        stroke-width="4" />
+
+  <!-- 2. Rear "Shadow" Screen Frame (offset down-right) -->
+  <rect x="174" y="225" width="236" height="170" rx="30" ry="30"
+        fill="none"
+        stroke="url(#rearScreenGrad)"
+        stroke-width="26"
+        stroke-linejoin="round" />
+
+  <!-- 3. Front "Primary" Screen Frame with Neon Glow (offset up-left) -->
+  <!-- Ambient Neon Glow -->
+  <rect x="106" y="171" width="236" height="170" rx="30" ry="30"
+        fill="none"
+        stroke="#00e5ff"
+        stroke-width="28"
+        stroke-linejoin="round"
+        opacity="0.4"
+        filter="url(#neonGlow)" />
+
+  <!-- Sharp Main Screen Layer -->
+  <rect x="106" y="171" width="236" height="170" rx="30" ry="30"
+        fill="none"
+        stroke="url(#frontScreenGrad)"
+        stroke-width="26"
+        stroke-linejoin="round" />
+
+  <!-- 4. High-Contrast Lightning Bolt (Centered inside front screen) -->
+  <path d="M 243 187
+           L 180 269
+           L 220 269
+           L 203 332
+           L 266 250
+           L 226 250 Z"
+        fill="url(#boltGrad)"
+        filter="url(#boltGlow)" />
+</svg>

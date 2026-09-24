@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/RdpShadow.Agent/RdpShadow.Agent.csproj" />
+    <Project Path="src/RdpShadow.App/RdpShadow.App.csproj" />
+  </Folder>
+</Solution>

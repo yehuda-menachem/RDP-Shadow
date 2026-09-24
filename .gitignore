@@ -1,0 +1,8 @@
+/build.ps1
+/project_spec.md
+.dotnet_cli/
+bin/
+obj/
+/dist/
+.vs/
+*.user

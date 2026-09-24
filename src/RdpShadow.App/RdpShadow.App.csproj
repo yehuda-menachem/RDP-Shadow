@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <!-- WPF0001: ThemeMode (built-in Fluent theme) is still marked experimental -->
+    <NoWarn>$(NoWarn);WPF0001</NoWarn>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Mica extends the frame over the whole client area, and DWM then blends the hosted mstsc window
+         (GDI pixels, alpha 0) additively with the backdrop: the remote screen looked washed out. -->
+    <RuntimeHostConfigurationOption Include="Switch.System.Windows.Appearance.DisableFluentThemeWindowBackdrop" Value="true" />
+    <Compile Include="..\Shared\*.cs" LinkBase="Shared" />
+    <!-- ApplicationIcon only embeds a Win32 icon (Explorer/taskbar). MainWindow's Icon="Assets/app.ico" needs it as a WPF resource too. -->
+    <Resource Include="Assets\app.ico" />
+    <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.12" />
+  </ItemGroup>
+
+</Project>
