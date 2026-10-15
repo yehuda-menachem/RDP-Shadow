@@ -18,6 +18,8 @@ public sealed record ClipSettings
     public int MaxMegabytes { get; init; } = 100;
 }
 
+public sealed record WindowBounds(double Left, double Top, double Width, double Height, bool Maximized);
+
 /// <summary>Local app settings, %AppData%\RdpShadow\settings.json.</summary>
 public sealed class AppSettings
 {
@@ -29,6 +31,18 @@ public sealed class AppSettings
     public ClipSettings Clipboard { get; set; } = new();
     public int Brightness { get; set; }
     public int Contrast { get; set; } = 100;
+    /// <summary>Interface zoom of the settings pages and the session bar (not the remote picture).</summary>
+    public double UiScale { get; set; } = 1;
+    /// <summary>System, Light or Dark. Accent color always follows Windows.</summary>
+    public string Theme { get; set; } = "System";
+    /// <summary>Picture behind the settings pages (full path), or null.</summary>
+    public string? BackgroundImage { get; set; }
+    /// <summary>0..95 percent; the image is drawn at 1 - this.</summary>
+    public int BackgroundTransparency { get; set; } = 70;
+    /// <summary>0..90 percent see-through for cards, buttons and fields while a background image is shown.</summary>
+    public int SurfaceTransparency { get; set; } = 30;
+    /// <summary>Last normal (restored) window position, in DIPs.</summary>
+    public WindowBounds? Window { get; set; }
 
     public static AppSettings Load()
     {
@@ -60,7 +74,8 @@ public sealed class Computer(string host) : INotifyPropertyChanged
     string _detail = "בודק...", _shadowText = "בודק", _shadowColor = Gray, _agentText = "", _agentColor = Gray;
     bool _canConnect, _needsAgent, _agentOutdated;
 
-    public const string Green = "#6CCB5F", Yellow = "#FCE100", Gray = "#9A9A9A";
+    // Keys for the StatusDot style (App.xaml), which maps them to theme brushes: fixed hex colors were unreadable in one of light/dark.
+    public const string Green = "Success", Yellow = "Caution", Gray = "Neutral";
 
     public event PropertyChangedEventHandler? PropertyChanged;
 

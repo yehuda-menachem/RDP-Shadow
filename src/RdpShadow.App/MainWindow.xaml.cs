@@ -7,6 +7,8 @@ using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using RdpShadow.Shared;
 
@@ -34,6 +36,13 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        RestoreWindowBounds();
+        SetZoom(_settings.UiScale);
+        BgTransparency.Value = Math.Clamp(_settings.BackgroundTransparency, 0, 95);
+        SurfaceTransparency.Value = Math.Clamp(_settings.SurfaceTransparency, 0, 90);
+        ApplyBackground();
+        // Selecting the item applies the theme (ThemeBox_SelectionChanged); unknown value = follow Windows.
+        ThemeBox.SelectedItem = ThemeBox.Items.Cast<ComboBoxItem>().FirstOrDefault(i => (string)i.Tag == _settings.Theme) ?? ThemeBox.Items[0];
         foreach (var host in _settings.Computers) _computers.Add(new Computer(host));
         ComputerList.ItemsSource = _computers;
         QualityHostBox.ItemsSource = PrepareHostBox.ItemsSource = _computers;
@@ -68,11 +77,230 @@ public partial class MainWindow : Window
     void Nav_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (Nav.SelectedItem is not ListBoxItem { Tag: UIElement page }) return;
-        foreach (var p in new UIElement[] { ComputersPage, ClipboardPage, QualityPage, PreparePage })
+        if (page.Visibility != Visibility.Visible) FadeIn(page);
+        foreach (var p in new UIElement[] { ComputersPage, ClipboardPage, QualityPage, PreparePage, AppearancePage })
             p.Visibility = p == page ? Visibility.Visible : Visibility.Collapsed;
         if (page == QualityPage && QualityHostBox.SelectedItem is null) QualityHostBox.SelectedIndex = 0;
         if (page == PreparePage && PrepareHostBox.SelectedItem is null) PrepareHostBox.SelectedIndex = 0;
     }
+
+    /// <summary>Fade + short rise. Skipped when Windows animations are off (accessibility setting).</summary>
+    static void FadeIn(UIElement e, double rise = 12)
+    {
+        if (!SystemParameters.ClientAreaAnimation) return;
+        var duration = TimeSpan.FromMilliseconds(260);
+        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+        if (e.RenderTransform is not TranslateTransform move) e.RenderTransform = move = new TranslateTransform();
+        e.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, duration) { EasingFunction = ease });
+        move.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(rise, 0, duration) { EasingFunction = ease });
+    }
+
+    // ================= window size & interface zoom =================
+
+    static readonly double[] Zooms = [0.8, 0.9, 1, 1.1, 1.25, 1.4, 1.6];
+
+    void RestoreWindowBounds()
+    {
+        var b = _settings.Window;
+        var screen = new Rect(SystemParameters.VirtualScreenLeft, SystemParameters.VirtualScreenTop,
+            SystemParameters.VirtualScreenWidth, SystemParameters.VirtualScreenHeight);
+        // The title bar must still be on a screen (a monitor may have been unplugged since).
+        if (b is not null && b.Width >= MinWidth && b.Height >= MinHeight && screen.Contains(new Point(b.Left + b.Width / 2, b.Top + 16)))
+        {
+            WindowStartupLocation = WindowStartupLocation.Manual;
+            (Left, Top, Width, Height) = (b.Left, b.Top, b.Width, b.Height);
+            if (b.Maximized) WindowState = WindowState.Maximized;
+            return;
+        }
+        // First run: 1280x820 doesn't fit a 1366x768 laptop at 125%.
+        var work = SystemParameters.WorkArea;
+        (Width, Height) = (Math.Max(MinWidth, Math.Min(Width, work.Width * 0.92)), Math.Max(MinHeight, Math.Min(Height, work.Height * 0.92)));
+    }
+
+    void Window_Closing(object? sender, CancelEventArgs e)
+    {
+        var r = RestoreBounds; // normal-state bounds, also while maximized/minimized/full screen
+        if (!r.IsEmpty && r.Width > 0)
+        {
+            var maximized = (_fullScreen ? _stateBeforeFullScreen : WindowState) == WindowState.Maximized;
+            _settings.Window = new WindowBounds(r.Left, r.Top, r.Width, r.Height, maximized);
+        }
+        _settings.Save(); // also the transparency slider, which isn't saved on every drag step
+    }
+
+    // ================= appearance: background image =================
+
+    void BgPick_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "בחירת תמונת רקע",
+            Filter = "תמונות|*.jpg;*.jpeg;*.png;*.bmp;*.gif;*.tif;*.tiff;*.webp;*.heic|כל הקבצים|*.*",
+        };
+        if (dialog.ShowDialog(this) != true) return;
+        var previous = _settings.BackgroundImage;
+        _settings.BackgroundImage = dialog.FileName;
+        if (!ApplyBackground())
+        {
+            // Not an image (or no codec, e.g. HEIC without the Store extension): keep the old background.
+            _settings.BackgroundImage = previous;
+            ApplyBackground();
+            BgStatus.Text = $"לא ניתן לפתוח את {Path.GetFileName(dialog.FileName)} כתמונה";
+            return;
+        }
+        _settings.Save();
+    }
+
+    void BgRemove_Click(object sender, RoutedEventArgs e)
+    {
+        _settings.BackgroundImage = null;
+        _settings.Save();
+        ApplyBackground();
+    }
+
+    void BgTransparency_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (ShellBackground is null) return; // fires during InitializeComponent
+        _settings.BackgroundTransparency = (int)BgTransparency.Value;
+        ShellBackground.Opacity = 1 - BgTransparency.Value / 100;
+    }
+
+    // Fluent theme brushes behind cards, buttons, fields and our toggle track. Accent (primary buttons, toggles on) stays solid.
+    static readonly string[] SurfaceBrushes =
+    [
+        "CardBackgroundFillColorDefaultBrush", "CardBackgroundFillColorSecondaryBrush",
+        "ButtonBackground", "ButtonBackgroundPointerOver", "ButtonBackgroundPressed",
+        "ToggleButtonBackground", "ToggleButtonBackgroundPointerOver", "ToggleButtonBackgroundPressed",
+        "ComboBoxBackground", "ComboBoxBackgroundPointerOver", "ComboBoxBackgroundPressed",
+        "TextControlBackground", "TextControlBackgroundPointerOver", "TextControlBackgroundFocused",
+        "ToggleSwitchFillOff", "ToggleSwitchFillOffPointerOver",
+    ];
+
+    void SurfaceTransparency_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (ShellBackground is null) return; // fires during InitializeComponent
+        _settings.SurfaceTransparency = (int)SurfaceTransparency.Value; // saved on close, like the image transparency
+        ApplySurfaceTransparency();
+    }
+
+    /// <summary>
+    /// Over a background image, replaces the surface brushes on the pages with an opaque equivalent (theme color composited
+    /// over the window background) at the chosen alpha, so 0% = solid and the text on top stays fully opaque.
+    /// Without an image the theme's own brushes are used untouched.
+    /// </summary>
+    void ApplySurfaceTransparency()
+    {
+        var hasImage = ShellBackground.Source is not null;
+        SurfaceTransparency.IsEnabled = hasImage;
+        SurfaceHint.Text = hasImage ? "רק הרקע שלהם נעשה שקוף, הטקסט נשאר מלא. 0% = אטום" : "פעיל כשיש תמונת רקע";
+        foreach (var key in SurfaceBrushes) PagesHost.Resources.Remove(key);
+        if (!hasImage) return;
+        // The Fluent window's own Background is transparent (#00FFFFFF; the frame paints the base color), so use the theme base.
+        var under = Background is SolidColorBrush { Color.A: 255 } solid ? solid.Color
+            : Application.Current.TryFindResource("SolidBackgroundFillColorBase") as Color? ?? Colors.White;
+        var alpha = 1 - SurfaceTransparency.Value / 100;
+        foreach (var key in SurfaceBrushes)
+        {
+            if (Application.Current.TryFindResource(key) is not SolidColorBrush { Color: var c }) continue; // not in this theme version
+            var brush = new SolidColorBrush(Flatten(c, under, alpha));
+            brush.Freeze();
+            PagesHost.Resources[key] = brush;
+        }
+    }
+
+    /// <summary><paramref name="top"/> composited over opaque <paramref name="under"/>, then given <paramref name="alpha"/> (0..1).</summary>
+    static Color Flatten(Color top, Color under, double alpha)
+    {
+        var a = top.A / 255.0;
+        byte Mix(byte t, byte u) => (byte)Math.Round(t * a + u * (1 - a));
+        return Color.FromArgb((byte)Math.Round(255 * alpha), Mix(top.R, under.R), Mix(top.G, under.G), Mix(top.B, under.B));
+    }
+
+    /// <returns>false if a path is set but couldn't be loaded.</returns>
+    bool ApplyBackground()
+    {
+        var path = _settings.BackgroundImage;
+        BitmapImage? image = null;
+        if (!string.IsNullOrEmpty(path))
+        {
+            try
+            {
+                image = new BitmapImage();
+                image.BeginInit();
+                image.UriSource = new Uri(path);
+                image.CacheOption = BitmapCacheOption.OnLoad; // decode now and release the file
+                // ponytail: fixed decode width caps memory for 8K photos; small images get upscaled (at most ~25MB).
+                image.DecodePixelWidth = 2560;
+                image.EndInit();
+                image.Freeze();
+            }
+            catch (Exception ex) when (ex is IOException or NotSupportedException or FormatException or UnauthorizedAccessException
+                or ArgumentException or InvalidOperationException or System.Runtime.InteropServices.ExternalException)
+            {
+                image = null;
+            }
+        }
+        ShellBackground.Source = image;
+        ShellBackground.Visibility = image is null ? Visibility.Collapsed : Visibility.Visible;
+        ShellBackground.Opacity = 1 - BgTransparency.Value / 100;
+        BgRemoveButton.IsEnabled = !string.IsNullOrEmpty(path);
+        BgStatus.Text = image is not null ? Path.GetFileName(path)! : string.IsNullOrEmpty(path) ? "אין תמונה" : "הקובץ לא נמצא או שאינו תמונה";
+        ApplySurfaceTransparency();
+        return image is not null || string.IsNullOrEmpty(path);
+    }
+
+    void SetZoom(double zoom)
+    {
+        if (!(zoom >= Zooms[0])) zoom = 1; // also NaN from a hand-edited settings file
+        zoom = Math.Min(zoom, Zooms[^1]);
+        if (_settings.UiScale != zoom) { _settings.UiScale = zoom; _settings.Save(); }
+        // Not on the session view itself: the hosted mstsc window can't be transformed (and has its own fit-to-window).
+        Shell.LayoutTransform = SessionBar.LayoutTransform = zoom == 1 ? Transform.Identity : new ScaleTransform(zoom, zoom);
+        ZoomButton.Content = $"{zoom * 100:0}%";
+        UpdateNavWidth();
+    }
+
+    void StepZoom(int direction) => SetZoom(direction > 0
+        ? Zooms.FirstOrDefault(z => z > _settings.UiScale + 0.001, Zooms[^1])
+        : Zooms.LastOrDefault(z => z < _settings.UiScale - 0.001, Zooms[0]));
+
+    void ThemeBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (ThemeBox.SelectedItem is not ComboBoxItem { Tag: string theme }) return;
+        Application.Current.ThemeMode = theme switch { "Light" => ThemeMode.Light, "Dark" => ThemeMode.Dark, _ => ThemeMode.System };
+        // The overrides are flattened copies of the old theme's colors; rebuild once the new theme has reached the window.
+        Dispatcher.BeginInvoke(ApplySurfaceTransparency, DispatcherPriority.Background);
+        if (_settings.Theme != theme) { _settings.Theme = theme; _settings.Save(); }
+    }
+
+    void ZoomIn_Click(object sender, RoutedEventArgs e) => StepZoom(1);
+    void ZoomOut_Click(object sender, RoutedEventArgs e) => StepZoom(-1);
+    void ZoomReset_Click(object sender, RoutedEventArgs e) => SetZoom(1);
+
+    void Window_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (Keyboard.Modifiers != ModifierKeys.Control) return;
+        switch (e.Key)
+        {
+            case Key.OemPlus or Key.Add: StepZoom(1); break;
+            case Key.OemMinus or Key.Subtract: StepZoom(-1); break;
+            case Key.D0 or Key.NumPad0: SetZoom(1); break;
+            default: return;
+        }
+        e.Handled = true;
+    }
+
+    void Window_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (Keyboard.Modifiers != ModifierKeys.Control || e.Delta == 0) return;
+        StepZoom(Math.Sign(e.Delta));
+        e.Handled = true;
+    }
+
+    void Window_SizeChanged(object sender, SizeChangedEventArgs e) => UpdateNavWidth();
+
+    /// <summary>Nav takes about a quarter of the window, 220..300, so a narrow window leaves room for the cards.</summary>
+    void UpdateNavWidth() => NavColumn.Width = new GridLength(Math.Clamp(ActualWidth / _settings.UiScale * 0.24, 220, 300));
 
     void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
     {
@@ -210,8 +438,10 @@ public partial class MainWindow : Window
         SessionPlaceholder.Text = "פותח Shadow...";
         _control = control;
         (ModeControl.IsChecked, ModeView.IsChecked) = (control, !control);
+        SetLive(false);
         Shell.Visibility = Visibility.Hidden;
         SessionView.Visibility = Visibility.Visible;
+        FadeIn(SessionBar, -10);
         try
         {
             await OpenShadowAsync(c);
@@ -238,6 +468,7 @@ public partial class MainWindow : Window
         SessionDetail.Text = s.User is null ? $"סשן {s.Id}" : $"{s.User} · סשן {s.Id}";
         await Shadow.ConnectAsync(c.Host, s.Id, _control);
         SessionPlaceholder.Text = "";
+        SetLive(true);
         _connectedAt = DateTime.UtcNow;
     }
 
@@ -255,6 +486,7 @@ public partial class MainWindow : Window
 
         var deadline = DateTime.UtcNow.AddMinutes(1);
         string? lastError = null;
+        SetLive(false);
         while (DateTime.UtcNow < deadline)
         {
             SessionDetail.Text = SessionPlaceholder.Text = "החיבור נפל. מתחבר מחדש...";
@@ -303,14 +535,28 @@ public partial class MainWindow : Window
         var computer = _session;
         _session = null;
         _sessionEpoch++;
+        SetLive(null);
         SessionView.Visibility = Visibility.Hidden;
         Shell.Visibility = Visibility.Visible;
+        FadeIn(Shell, 0);
         ComputersNotice.Text = notice ?? "";
         ComputersNotice.Visibility = notice is null ? Visibility.Collapsed : Visibility.Visible;
         if (computer is not null) _ = ProbeAsync(computer);
     }
 
     void Disconnect_Click(object sender, RoutedEventArgs e) => EndSession();
+
+    /// <summary>true: picture is up. false: (re)connecting, progress + pulsing yellow dot. null: no session.</summary>
+    void SetLive(bool? live)
+    {
+        // The empty HwndHost container would paint over the progress, so it's shown only with a viewer in it.
+        Shadow.Visibility = live == true ? Visibility.Visible : Visibility.Hidden;
+        SessionProgress.Visibility = live == false ? Visibility.Visible : Visibility.Collapsed;
+        SessionDot.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, live == true ? "SystemFillColorSuccessBrush" : "SystemFillColorCautionBrush"); // live reference: follows a theme switch
+        SessionDot.BeginAnimation(OpacityProperty, live == false && SystemParameters.ClientAreaAnimation
+            ? new DoubleAnimation(1, 0.25, TimeSpan.FromMilliseconds(700)) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever }
+            : null);
+    }
 
     async void Mode_Click(object sender, RoutedEventArgs e)
     {
@@ -323,10 +569,12 @@ public partial class MainWindow : Window
         }
         _control = control;
         SessionPlaceholder.Text = "מחליף מצב...";
+        SetLive(false);
         try
         {
             await Shadow.ConnectAsync(_session.Host, _sessionId, control);
             SessionPlaceholder.Text = "";
+            SetLive(true);
             _connectedAt = DateTime.UtcNow;
         }
         catch (OperationCanceledException) { }
@@ -386,7 +634,7 @@ public partial class MainWindow : Window
             ClipboardLink.State.Unavailable => ("לוח לא זמין", "", "SystemFillColorCautionBrush"),
             _ => (message ?? "", "", "TextFillColorSecondaryBrush"),
         };
-        ClipPillText.Foreground = ClipPillIcon.Foreground = (Brush)FindResource(brush);
+        SetForeground(brush, ClipPillText, ClipPillIcon);
         ClipPill.ToolTip = message;
     }
 
@@ -397,7 +645,7 @@ public partial class MainWindow : Window
         ClipProgress.Value = 100.0 * done / total;
         ClipPillText.Text = $"{(direction == "in" ? "מקבל" : "שולח")} {done >> 20}/{total >> 20}MB";
         ClipPillIcon.Text = direction == "in" ? "" : ""; // Download / Upload
-        ClipPillText.Foreground = ClipPillIcon.Foreground = (Brush)FindResource("TextFillColorPrimaryBrush");
+        SetForeground("TextFillColorPrimaryBrush", ClipPillText, ClipPillIcon);
     }
 
     void OnSynced(string direction, string what)
@@ -412,8 +660,10 @@ public partial class MainWindow : Window
     void ShowToast(string title, string text)
     {
         (ToastTitle.Text, ToastText.Text) = (title, text);
-        Toast.HorizontalOffset = 20;
-        Toast.VerticalOffset = Math.Max(0, SessionView.ActualHeight - 90);
+        // Bottom corner; measured because long text wraps to more lines.
+        Toast.Child.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        Toast.HorizontalOffset = 8;
+        Toast.VerticalOffset = Math.Max(0, SessionView.ActualHeight - Toast.Child.DesiredSize.Height - 4);
         Toast.IsOpen = true;
         _toastTimer.Stop();
         _toastTimer.Start();
@@ -560,8 +810,14 @@ public partial class MainWindow : Window
     void Mark(TextBlock target, (bool Ok, string Text)? state)
     {
         target.Text = state is { } s ? (s.Ok ? "✓ " : "⚠ ") + s.Text : "לא ידוע (דרוש Agent)";
-        target.Foreground = (Brush)FindResource(state is null ? "TextFillColorSecondaryBrush"
-            : state.Value.Ok ? "SystemFillColorSuccessBrush" : "SystemFillColorCautionBrush");
+        SetForeground(state is null ? "TextFillColorSecondaryBrush"
+            : state.Value.Ok ? "SystemFillColorSuccessBrush" : "SystemFillColorCautionBrush", target);
+    }
+
+    /// <summary>Live resource reference, so the color follows a theme switch (FindResource would freeze the old one).</summary>
+    static void SetForeground(string brushKey, params TextBlock[] targets)
+    {
+        foreach (var t in targets) t.SetResourceReference(TextBlock.ForegroundProperty, brushKey);
     }
 
     async void FixAll_Click(object sender, RoutedEventArgs e)

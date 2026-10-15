@@ -5,6 +5,7 @@
              ThemeMode="System">
     <Application.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+        <CubicEase x:Key="EaseOut" EasingMode="EaseOut" />
         <FontFamily x:Key="IconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
 
         <Style x:Key="Icon" TargetType="TextBlock">
@@ -13,6 +14,21 @@
             <Setter Property="VerticalAlignment" Value="Center" />
             <!-- Glyphs are drawn LTR; mirroring would flip arrows and checkmarks -->
             <Setter Property="FlowDirection" Value="LeftToRight" />
+        </Style>
+
+        <!-- Status dot: Tag = Computer.Green/Yellow/Gray key; theme brushes keep contrast in light and dark -->
+        <Style x:Key="StatusDot" TargetType="Ellipse">
+            <Setter Property="Width" Value="8" />
+            <Setter Property="Height" Value="8" />
+            <Setter Property="Fill" Value="{DynamicResource SystemFillColorNeutralBrush}" />
+            <Style.Triggers>
+                <Trigger Property="Tag" Value="Success">
+                    <Setter Property="Fill" Value="{DynamicResource SystemFillColorSuccessBrush}" />
+                </Trigger>
+                <Trigger Property="Tag" Value="Caution">
+                    <Setter Property="Fill" Value="{DynamicResource SystemFillColorCautionBrush}" />
+                </Trigger>
+            </Style.Triggers>
         </Style>
 
         <Style x:Key="PageTitle" TargetType="TextBlock">
@@ -35,6 +51,21 @@
             <Setter Property="Padding" Value="20,12" />
             <Setter Property="Margin" Value="0,0,0,4" />
             <Setter Property="MinHeight" Value="68" />
+        </Style>
+
+        <!-- Rows you act on (computers): hover feedback like clickable cards in Settings -->
+        <Style x:Key="HoverCard" TargetType="Border" BasedOn="{StaticResource Card}">
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorSecondaryBrush}" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Page column: capped like Settings so cards don't stretch across a wide monitor (Stretch + MaxWidth centers it) -->
+        <Style x:Key="PageContent" TargetType="StackPanel">
+            <Setter Property="Margin" Value="40,12,56,32" />
+            <Setter Property="MaxWidth" Value="1100" />
         </Style>
 
         <Style x:Key="CardTitle" TargetType="TextBlock">
@@ -68,8 +99,15 @@
                             <Grid Width="40" Height="20" Margin="8,0,0,0">
                                 <Border x:Name="Track" CornerRadius="10" BorderThickness="1"
                                         Background="{DynamicResource ToggleSwitchFillOff}" BorderBrush="{DynamicResource ToggleSwitchStrokeOff}" />
-                                <Ellipse x:Name="Knob" Width="12" Height="12" Margin="4,0" HorizontalAlignment="Left"
-                                         Fill="{DynamicResource ToggleSwitchKnobFillOff}" />
+                                <Ellipse x:Name="Knob" Width="12" Height="12" Margin="4,0" HorizontalAlignment="Left" RenderTransformOrigin="0.5,0.5"
+                                         Fill="{DynamicResource ToggleSwitchKnobFillOff}">
+                                    <Ellipse.RenderTransform>
+                                        <TransformGroup>
+                                            <ScaleTransform />
+                                            <TranslateTransform />
+                                        </TransformGroup>
+                                    </Ellipse.RenderTransform>
+                                </Ellipse>
                             </Grid>
                         </StackPanel>
                         <ControlTemplate.Triggers>
@@ -78,7 +116,46 @@
                                 <Setter TargetName="Track" Property="Background" Value="{DynamicResource ToggleSwitchFillOn}" />
                                 <Setter TargetName="Track" Property="BorderBrush" Value="{DynamicResource ToggleSwitchStrokeOn}" />
                                 <Setter TargetName="Knob" Property="Fill" Value="{DynamicResource ToggleSwitchKnobFillOn}" />
-                                <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right" />
+                                <!-- Track 40 - margins 2x4 - knob 12 = 20 -->
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Knob" To="20" Duration="0:0:0.18" EasingFunction="{StaticResource EaseOut}"
+                                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[1].(TranslateTransform.X)" />
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Knob" To="0" Duration="0:0:0.18" EasingFunction="{StaticResource EaseOut}"
+                                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[1].(TranslateTransform.X)" />
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+                            <!-- Knob grows 12 -> 14 on hover, like Windows 11 -->
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Knob" To="1.17" Duration="0:0:0.12"
+                                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[0].(ScaleTransform.ScaleX)" />
+                                            <DoubleAnimation Storyboard.TargetName="Knob" To="1.17" Duration="0:0:0.12"
+                                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[0].(ScaleTransform.ScaleY)" />
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Knob" To="1" Duration="0:0:0.12"
+                                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[0].(ScaleTransform.ScaleX)" />
+                                            <DoubleAnimation Storyboard.TargetName="Knob" To="1" Duration="0:0:0.12"
+                                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[0].(ScaleTransform.ScaleY)" />
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Opacity" Value="0.5" />
@@ -98,8 +175,12 @@
                     <ControlTemplate TargetType="ListBoxItem">
                         <Border x:Name="Bg" CornerRadius="6" Height="40" Background="Transparent">
                             <Grid>
-                                <Border x:Name="Pill" Width="3" Height="16" CornerRadius="2" HorizontalAlignment="Left"
-                                        Background="{DynamicResource AccentFillColorDefaultBrush}" Visibility="Collapsed" />
+                                <Border x:Name="Pill" Width="3" Height="16" CornerRadius="2" HorizontalAlignment="Left" RenderTransformOrigin="0.5,0.5"
+                                        Background="{DynamicResource AccentFillColorDefaultBrush}">
+                                    <Border.RenderTransform>
+                                        <ScaleTransform ScaleY="0" />
+                                    </Border.RenderTransform>
+                                </Border>
                                 <ContentPresenter Margin="14,0" VerticalAlignment="Center" />
                             </Grid>
                         </Border>
@@ -109,7 +190,22 @@
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
                                 <Setter TargetName="Bg" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
-                                <Setter TargetName="Pill" Property="Visibility" Value="Visible" />
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Pill" To="1" Duration="0:0:0.25" EasingFunction="{StaticResource EaseOut}"
+                                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" />
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Pill" To="0" Duration="0:0:0.12"
+                                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" />
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>

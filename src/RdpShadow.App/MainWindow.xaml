@@ -5,14 +5,20 @@
         Title="RDP Shadow" Width="1280" Height="820" MinWidth="900" MinHeight="560"
         WindowStartupLocation="CenterScreen" FlowDirection="RightToLeft"
         Icon="Assets/app.ico"
-        StateChanged="Window_StateChanged" Closed="Window_Closed">
+        StateChanged="Window_StateChanged" Closing="Window_Closing" Closed="Window_Closed"
+        SizeChanged="Window_SizeChanged" PreviewKeyDown="Window_PreviewKeyDown" PreviewMouseWheel="Window_PreviewMouseWheel">
     <Grid>
         <!-- ================= Shell: navigation + settings pages ================= -->
         <Grid x:Name="Shell">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="300" />
+                <!-- Width follows the window (Window_SizeChanged) -->
+                <ColumnDefinition x:Name="NavColumn" Width="300" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
+
+            <!-- Background image (Appearance page): pages column only, the nav stays plain. LTR so RTL doesn't mirror the picture -->
+            <Image x:Name="ShellBackground" Grid.Column="1" Stretch="UniformToFill" IsHitTestVisible="False" Visibility="Collapsed"
+                   FlowDirection="LeftToRight" RenderOptions.BitmapScalingMode="HighQuality" />
 
             <DockPanel Margin="12,8,12,12">
                 <Grid DockPanel.Dock="Top" Margin="0,4,0,12">
@@ -45,13 +51,17 @@
                     <ListBoxItem Tag="{Binding ElementName=PreparePage}">
                         <StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource Icon}" Text="&#xEA18;" Margin="0,0,14,0" /><TextBlock Text="הכנת מחשב" FontSize="14" /></StackPanel>
                     </ListBoxItem>
+                    <ListBoxItem Tag="{Binding ElementName=AppearancePage}">
+                        <StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource Icon}" Text="&#xE771;" Margin="0,0,14,0" /><TextBlock Text="מראה" FontSize="14" /></StackPanel>
+                    </ListBoxItem>
                 </ListBox>
             </DockPanel>
 
-            <Grid Grid.Column="1">
+            <!-- Resources here get the surface-transparency overrides (ApplySurfaceTransparency) -->
+            <Grid x:Name="PagesHost" Grid.Column="1">
                 <!-- Computers -->
                 <ScrollViewer x:Name="ComputersPage" VerticalScrollBarVisibility="Auto">
-                    <StackPanel Margin="40,12,56,32">
+                    <StackPanel Style="{StaticResource PageContent}">
                         <DockPanel Margin="0,0,0,18">
                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
                                 <Grid>
@@ -83,16 +93,31 @@
                         <ItemsControl x:Name="ComputerList">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate DataType="{x:Type local:Computer}">
-                                    <Border Style="{StaticResource Card}">
+                                    <Border Style="{StaticResource HoverCard}">
+                                        <!-- Rows slide in when added or when the search filter shows them -->
+                                        <Border.RenderTransform>
+                                            <TranslateTransform />
+                                        </Border.RenderTransform>
+                                        <Border.Triggers>
+                                            <EventTrigger RoutedEvent="FrameworkElement.Loaded">
+                                                <BeginStoryboard>
+                                                    <Storyboard>
+                                                        <DoubleAnimation Storyboard.TargetProperty="Opacity" From="0" To="1" Duration="0:0:0.3" />
+                                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)" From="10" To="0"
+                                                                         Duration="0:0:0.3" EasingFunction="{StaticResource EaseOut}" />
+                                                    </Storyboard>
+                                                </BeginStoryboard>
+                                            </EventTrigger>
+                                        </Border.Triggers>
                                         <DockPanel>
                                             <TextBlock DockPanel.Dock="Left" Style="{StaticResource Icon}" FontSize="26" Text="&#xE7F4;" Margin="0,0,16,0" />
                                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
                                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">
-                                                    <Ellipse Width="8" Height="8" Fill="{Binding ShadowColor}" Margin="0,0,6,0" />
+                                                    <Ellipse Style="{StaticResource StatusDot}" Tag="{Binding ShadowColor}" Margin="0,0,6,0" />
                                                     <TextBlock Text="{Binding ShadowText}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                                                 </StackPanel>
                                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">
-                                                    <Ellipse Width="8" Height="8" Fill="{Binding AgentColor}" Margin="0,0,6,0" />
+                                                    <Ellipse Style="{StaticResource StatusDot}" Tag="{Binding AgentColor}" Margin="0,0,6,0" />
                                                     <TextBlock Text="{Binding AgentText}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                                                 </StackPanel>
                                                 <Button Content="הכן מחשב" Height="32" Margin="0,0,8,0" Click="PrepareComputer_Click"
@@ -125,7 +150,7 @@
 
                 <!-- Clipboard -->
                 <ScrollViewer x:Name="ClipboardPage" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
-                    <StackPanel Margin="40,12,56,32">
+                    <StackPanel Style="{StaticResource PageContent}">
                         <TextBlock Text="לוח" Style="{StaticResource PageTitle}" />
 
                         <Border Style="{StaticResource Card}">
@@ -206,7 +231,7 @@
 
                 <!-- Quality -->
                 <ScrollViewer x:Name="QualityPage" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
-                    <StackPanel Margin="40,12,56,32">
+                    <StackPanel Style="{StaticResource PageContent}">
                         <DockPanel Margin="0,0,0,18">
                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
                                 <ComboBox x:Name="QualityHostBox" MinWidth="220" FlowDirection="LeftToRight" SelectionChanged="QualityHost_Changed" AutomationProperties.Name="מחשב" />
@@ -277,7 +302,7 @@
 
                 <!-- Prepare -->
                 <ScrollViewer x:Name="PreparePage" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
-                    <StackPanel Margin="40,12,56,32">
+                    <StackPanel Style="{StaticResource PageContent}">
                         <DockPanel Margin="0,0,0,18">
                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
                                 <ComboBox x:Name="PrepareHostBox" MinWidth="220" FlowDirection="LeftToRight" SelectionChanged="PrepareHost_Changed" AutomationProperties.Name="מחשב" />
@@ -327,7 +352,7 @@
                         </Border>
                         <Border Style="{StaticResource Card}">
                             <DockPanel>
-                                <ComboBox x:Name="PShadowBox" DockPanel.Dock="Right" MinWidth="220" VerticalAlignment="Center" AutomationProperties.Name="הרשאת Shadow">
+                                <ComboBox x:Name="PShadowBox" SelectedIndex="1" DockPanel.Dock="Right" MinWidth="220" VerticalAlignment="Center" AutomationProperties.Name="הרשאת Shadow">
                                     <ComboBoxItem Content="שליטה מלאה עם אישור" Tag="1" />
                                     <ComboBoxItem Content="שליטה מלאה בלי אישור" Tag="2" />
                                     <ComboBoxItem Content="צפייה בלבד עם אישור" Tag="3" />
@@ -366,18 +391,110 @@
                         <TextBlock x:Name="PrepareStatus" Style="{StaticResource Hint}" Margin="0,14,0,0" />
                     </StackPanel>
                 </ScrollViewer>
+
+                <!-- Appearance -->
+                <ScrollViewer x:Name="AppearancePage" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
+                    <StackPanel Style="{StaticResource PageContent}">
+                        <TextBlock Text="מראה" Style="{StaticResource PageTitle}" />
+                        <Border Style="{StaticResource Card}">
+                            <DockPanel>
+                                <TextBlock DockPanel.Dock="Left" Style="{StaticResource Icon}" FontSize="20" Text="&#xE790;" Margin="0,0,16,0" />
+                                <ComboBox x:Name="ThemeBox" DockPanel.Dock="Right" MinWidth="200" VerticalAlignment="Center"
+                                          SelectionChanged="ThemeBox_SelectionChanged" AutomationProperties.Name="ערכת נושא">
+                                    <ComboBoxItem Content="לפי Windows" Tag="System" />
+                                    <ComboBoxItem Content="בהיר" Tag="Light" />
+                                    <ComboBoxItem Content="כהה" Tag="Dark" />
+                                </ComboBox>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="ערכת נושא" Style="{StaticResource CardTitle}" />
+                                    <TextBlock Text="צבע ההדגשה נלקח מ-Windows" Style="{StaticResource CardDescription}" />
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+                        <Border Style="{StaticResource Card}">
+                            <DockPanel>
+                                <TextBlock DockPanel.Dock="Left" Style="{StaticResource Icon}" FontSize="20" Text="&#xE8D3;" Margin="0,0,16,0" />
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Button Width="36" Height="32" Padding="0" Click="ZoomOut_Click" ToolTip="הקטן (Ctrl+מינוס)" AutomationProperties.Name="הקטן ממשק">
+                                        <TextBlock Style="{StaticResource Icon}" FontSize="12" Text="&#xE738;" />
+                                    </Button>
+                                    <Button x:Name="ZoomButton" MinWidth="64" Height="32" Padding="8,0" Margin="6,0" Click="ZoomReset_Click"
+                                            ToolTip="חזרה ל-100% (Ctrl+0)" AutomationProperties.Name="גודל ממשק, איפוס" FlowDirection="LeftToRight" Content="100%" />
+                                    <Button Width="36" Height="32" Padding="0" Click="ZoomIn_Click" ToolTip="הגדל (Ctrl+פלוס)" AutomationProperties.Name="הגדל ממשק">
+                                        <TextBlock Style="{StaticResource Icon}" FontSize="12" Text="&#xE710;" />
+                                    </Button>
+                                </StackPanel>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="גודל ממשק" Style="{StaticResource CardTitle}" />
+                                    <TextBlock Text="גם Ctrl+פלוס/מינוס, Ctrl+0 ו-Ctrl+גלגלת. לא משנה את התמונה המרוחקת" Style="{StaticResource CardDescription}" />
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+
+                        <TextBlock Text="רקע" Style="{StaticResource SectionTitle}" />
+
+                        <Border Style="{StaticResource Card}">
+                            <DockPanel>
+                                <TextBlock DockPanel.Dock="Left" Style="{StaticResource Icon}" FontSize="20" Text="&#xEB9F;" Margin="0,0,16,0" />
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Button x:Name="BgRemoveButton" Content="הסר" Height="32" Margin="0,0,8,0" Click="BgRemove_Click" />
+                                    <Button Content="בחר תמונה..." Height="32" Style="{DynamicResource AccentButtonStyle}" Click="BgPick_Click" />
+                                </StackPanel>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="תמונת רקע" Style="{StaticResource CardTitle}" />
+                                    <TextBlock x:Name="BgStatus" Style="{StaticResource CardDescription}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+                        <Border Style="{StaticResource Card}">
+                            <DockPanel>
+                                <TextBlock DockPanel.Dock="Left" Style="{StaticResource Icon}" FontSize="20" Text="&#xE706;" Margin="0,0,16,0" />
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Slider x:Name="BgTransparency" Width="200" Minimum="0" Maximum="95" SmallChange="5" LargeChange="10" TickFrequency="5"
+                                            IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="BgTransparency_Changed" AutomationProperties.Name="שקיפות התמונה" />
+                                    <TextBlock Text="{Binding Value, ElementName=BgTransparency, StringFormat={}{0}%}" MinWidth="44" Margin="12,0,0,0"
+                                               VerticalAlignment="Center" TextAlignment="Center" FlowDirection="LeftToRight" />
+                                </StackPanel>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="שקיפות התמונה" Style="{StaticResource CardTitle}" />
+                                    <TextBlock Text="ככל שהערך גבוה יותר, התמונה עדינה יותר והטקסט קריא יותר" Style="{StaticResource CardDescription}" />
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+                        <Border Style="{StaticResource Card}">
+                            <DockPanel>
+                                <TextBlock DockPanel.Dock="Left" Style="{StaticResource Icon}" FontSize="20" Text="&#xE8A9;" Margin="0,0,16,0" />
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Slider x:Name="SurfaceTransparency" Width="200" Minimum="0" Maximum="90" SmallChange="5" LargeChange="10" TickFrequency="5"
+                                            IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SurfaceTransparency_Changed"
+                                            AutomationProperties.Name="שקיפות כרטיסים וכפתורים" />
+                                    <TextBlock Text="{Binding Value, ElementName=SurfaceTransparency, StringFormat={}{0}%}" MinWidth="44" Margin="12,0,0,0"
+                                               VerticalAlignment="Center" TextAlignment="Center" FlowDirection="LeftToRight" />
+                                </StackPanel>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="שקיפות כרטיסים וכפתורים" Style="{StaticResource CardTitle}" />
+                                    <TextBlock x:Name="SurfaceHint" Style="{StaticResource CardDescription}"
+                                               Text="רק הרקע שלהם נעשה שקוף, הטקסט נשאר מלא. 0% = אטום" />
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+                        <TextBlock Style="{StaticResource Hint}" Margin="0,14,0,0"
+                                   Text="התמונה מוצגת מאחורי תוכן העמודים בלבד: לא מאחורי התפריט ולא מאחורי המסך המרוחק." />
+                    </StackPanel>
+                </ScrollViewer>
             </Grid>
         </Grid>
 
         <!-- ================= Session: shadow view ================= -->
         <!-- Hidden (not Collapsed) so the HwndHost exists before the first connect -->
         <DockPanel x:Name="SessionView" Visibility="Hidden">
-            <Border DockPanel.Dock="Top" Height="52" Padding="12,0" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}">
+            <Border x:Name="SessionBar" DockPanel.Dock="Top" Height="52" Padding="12,0" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}">
                 <DockPanel>
-                    <Ellipse x:Name="SessionDot" Width="8" Height="8" Fill="#6CCB5F" VerticalAlignment="Center" Margin="0,0,10,0" />
+                    <!-- Color and pulse set by SetLive: green when the picture is up, pulsing yellow while (re)connecting -->
+                    <Ellipse x:Name="SessionDot" Width="8" Height="8" Fill="{DynamicResource SystemFillColorSuccessBrush}" VerticalAlignment="Center" Margin="0,0,10,0" />
                     <StackPanel VerticalAlignment="Center">
-                        <TextBlock x:Name="SessionHost" FontSize="14" FontWeight="SemiBold" />
-                        <TextBlock x:Name="SessionDetail" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        <TextBlock x:Name="SessionHost" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                        <TextBlock x:Name="SessionDetail" FontSize="11" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                         <Border x:Name="ClipPill" CornerRadius="14" Height="28" Padding="10,0" Margin="0,0,10,0" Background="{DynamicResource SubtleFillColorSecondaryBrush}">
@@ -399,9 +516,13 @@
                         </Button>
                         <!-- Popup: a separate window, so it draws above the hosted viewer and the color filter -->
                         <Popup x:Name="ColorPopup" PlacementTarget="{Binding ElementName=ColorButton}" Placement="Bottom" StaysOpen="False"
-                               Closed="ColorPopup_Closed">
-                            <Border Width="300" Padding="16,12" CornerRadius="8" BorderThickness="1"
+                               AllowsTransparency="True" PopupAnimation="Fade" Closed="ColorPopup_Closed">
+                            <!-- Transparent popup: rounded corners without square backing, room (margin) for the shadow -->
+                            <Border Width="300" Padding="16,12" Margin="12,4,12,16" CornerRadius="8" BorderThickness="1"
                                     Background="{DynamicResource SolidBackgroundFillColorBaseBrush}" BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}">
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="16" ShadowDepth="3" Direction="270" Opacity="0.28" />
+                                </Border.Effect>
                                 <StackPanel>
                                     <DockPanel>
                                         <TextBlock DockPanel.Dock="Right" Text="{Binding Value, ElementName=BrightnessSlider, StringFormat={}{0:+0;-0;0}}" />
@@ -433,24 +554,31 @@
             </Border>
             <Border Margin="8" CornerRadius="6" BorderThickness="1" ClipToBounds="True" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}">
                 <Grid>
-                    <TextBlock x:Name="SessionPlaceholder" HorizontalAlignment="Center" VerticalAlignment="Center"
-                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                    <!-- LTR: an RTL HwndHost would mirror the remote screen -->
-                    <local:ShadowHost x:Name="Shadow" FlowDirection="LeftToRight" />
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <ProgressBar x:Name="SessionProgress" IsIndeterminate="True" Visibility="Collapsed" Width="240" Margin="0,0,0,16" AutomationProperties.Name="מתחבר" />
+                        <TextBlock x:Name="SessionPlaceholder" HorizontalAlignment="Center" FontSize="14"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                    <!-- LTR: an RTL HwndHost would mirror the remote screen.
+                         Hidden until the viewer is adopted (SetLive), so the empty container doesn't cover the progress above. -->
+                    <local:ShadowHost x:Name="Shadow" FlowDirection="LeftToRight" Visibility="Hidden" />
                 </Grid>
             </Border>
         </DockPanel>
 
         <!-- Popup, not an overlay: WPF content can't draw over the hosted mstsc window (airspace) -->
         <Popup x:Name="Toast" PlacementTarget="{Binding ElementName=SessionView}" Placement="Relative" AllowsTransparency="True"
-               StaysOpen="True" IsHitTestVisible="False">
-            <Border Padding="16,12" CornerRadius="8" BorderThickness="1" Margin="0,0,0,0"
+               StaysOpen="True" IsHitTestVisible="False" PopupAnimation="Fade">
+            <Border Padding="16,12" CornerRadius="8" BorderThickness="1" Margin="12,12,12,16" MaxWidth="460"
                     Background="{DynamicResource SolidBackgroundFillColorBaseBrush}" BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="16" ShadowDepth="3" Direction="270" Opacity="0.28" />
+                </Border.Effect>
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Style="{StaticResource Icon}" Text="&#xE77F;" FontSize="18" Foreground="{DynamicResource AccentFillColorDefaultBrush}" Margin="0,0,12,0" />
                     <StackPanel>
-                        <TextBlock x:Name="ToastTitle" FontSize="13" />
-                        <TextBlock x:Name="ToastText" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        <TextBlock x:Name="ToastTitle" FontSize="13" FontWeight="SemiBold" />
+                        <TextBlock x:Name="ToastText" FontSize="12" TextWrapping="Wrap" MaxWidth="380" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                     </StackPanel>
                 </StackPanel>
             </Border>
