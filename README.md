@@ -20,6 +20,7 @@ and adds what Shadow lacks: clipboard sync, one-click machine preparation and di
 ![Platform](https://img.shields.io/badge/Platform-Windows_x64-0078D4?style=flat-square)
 ![UI](https://img.shields.io/badge/UI-WPF_Fluent-5C2D91?style=flat-square)
 ![Language](https://img.shields.io/badge/UI_language-Hebrew_(RTL)-0088CC?style=flat-square)
+![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)
 
 </div>
 
@@ -385,5 +386,4 @@ to everyone (`*`) to the local subnet. It reports back in `status.json` next to 
 
 ## 📜 License & Credits
 
-No license file is included yet, so the code is not licensed for reuse by default.
-Author: [@yehuda-menachem](https://github.com/yehuda-menachem).
+MIT, see [LICENSE](LICENSE). Author: [@yehuda-menachem](https://github.com/yehuda-menachem).
